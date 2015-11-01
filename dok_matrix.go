@@ -1,9 +1,5 @@
 package sparse
 
-import (
-	"fmt"
-)
-
 type DOKMatrix struct {
 	data  map[int]map[int]float64
 	shape [2]int
@@ -29,17 +25,17 @@ func (d *DOKMatrix) Shape() (int, int) {
 }
 
 func (d *DOKMatrix) Set(i, j int, val float64) {
-	row, ok := d.data[i]
+	_, ok := d.data[i]
 	if !ok {
 		d.data[i] = map[int]float64{j: val}
 		return
 	}
-	row[j] = val
+	d.data[i][j] = val
 }
 
 func (d *DOKMatrix) Copy() *DOKMatrix {
 	mcopy := NewDOKMatrix(d.shape[0], d.shape[1])
-	for i, row := range mcopy.data {
+	for i, row := range d.data {
 		mcopy.data[i] = map[int]float64{}
 		for j, val := range row {
 			mcopy.data[i][j] = val
@@ -48,22 +44,26 @@ func (d *DOKMatrix) Copy() *DOKMatrix {
 	return mcopy
 }
 
-func DOKSum(m1, m2 *DOKMatrix) (*DOKMatrix, error) {
+func AddDOK(m1, m2 *DOKMatrix) *DOKMatrix {
 	if m1.shape[0] != m2.shape[0] || m1.shape[1] != m2.shape[1] {
-		return nil, fmt.Errorf("Size mismatch")
+		panic("Size mismatch")
 	}
 	sum := m1.Copy()
 	for i, row := range m2.data {
-		for j, val := range row {
-			sumRow, ok := sum.data[i]
+		_, ok := sum.data[i]
+		if !ok {
+			sum.data[i] = map[int]float64{}
+		}
+		for j, val1 := range row {
+			val2, ok := sum.data[i][j]
 			if !ok {
-				sum.data[i] = map[int]float64{j: val}
+				sum.data[i][j] = val1
 				continue
 			}
-			sumRow[j] += val
+			sum.data[i][j] = val1 + val2
 		}
 	}
-	return sum, nil
+	return sum
 }
 
 func (d *DOKMatrix) NNZ() int {
