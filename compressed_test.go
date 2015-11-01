@@ -125,3 +125,55 @@ func BenchmarkInsertion(b *testing.B) {
 		}
 	}
 }
+
+func TestCSCMatrix(t *testing.T) {
+	Convey("Inserted values should be retrieved correctly.", t, func() {
+		a := NewCSRMatrix(3, 3)
+		a.Set(0, 1, 1.0)
+		So(a.Get(0, 1), ShouldEqual, 1.0)
+
+		a.Set(2, 2, 3.0)
+
+		So(a.Get(0, 1), ShouldEqual, 1.0)
+		So(a.Get(2, 2), ShouldEqual, 3.0)
+
+		a.Set(1, 0, 2.0)
+
+		So(a.Get(0, 1), ShouldEqual, 1.0)
+		So(a.Get(1, 0), ShouldEqual, 2.0)
+		So(a.Get(2, 2), ShouldEqual, 3.0)
+	})
+
+	Convey("Iterator should yield values correctly.", t, func() {
+		a := NewCSCMatrix(3, 3)
+		a.Set(0, 1, 1.0)
+		a.Set(2, 2, 3.0)
+		a.Set(1, 0, 2.0)
+		iter := a.IterTriplets()
+
+		triplet, ok := iter.Next()
+
+		So(ok, ShouldEqual, true)
+		So(triplet.Row, ShouldEqual, 1)
+		So(triplet.Col, ShouldEqual, 0)
+		So(triplet.Val, ShouldEqual, 2.0)
+
+		triplet, ok = iter.Next()
+
+		So(ok, ShouldEqual, true)
+		So(triplet.Row, ShouldEqual, 0)
+		So(triplet.Col, ShouldEqual, 1)
+		So(triplet.Val, ShouldEqual, 1.0)
+
+		triplet, ok = iter.Next()
+
+		So(ok, ShouldEqual, true)
+		So(triplet.Row, ShouldEqual, 2)
+		So(triplet.Col, ShouldEqual, 2)
+		So(triplet.Val, ShouldEqual, 3.0)
+
+		triplet, ok = iter.Next()
+		So(ok, ShouldEqual, false)
+		So(triplet, ShouldEqual, nil)
+	})
+}

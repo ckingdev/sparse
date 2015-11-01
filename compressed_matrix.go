@@ -1,27 +1,29 @@
 package sparse
 
-// CSRMatrix represents a sparse matrix in compressed row storage format.
-type CSRMatrix struct {
+// CompressedMatrix represents a sparse matrix in compressed row storage format.
+type CompressedMatrix struct {
 	// data in row-major format
 	data []float64
 
-	// column indices of values in CSRMatrix.data
+	// column indices of values in CompressedMatrix.data
 	indices []int
 
 	// index in data of first element in each row
 	indptr []int
 
 	shape [2]int
+
+	isCSC bool
 }
 
 // Shape returns two ints describing the mxn shape of the matrix.
-func (c *CSRMatrix) Shape() (int, int) {
+func (c *CompressedMatrix) Shape() (int, int) {
 	return c.shape[0], c.shape[1]
 }
 
-// NewCSRMatrix creates a new CSRMatrix with the given shape.
-func NewCSRMatrix(m, n int) *CSRMatrix {
-	return &CSRMatrix{
+// NewCSRMatrix creates a new CompressedMatrix in CSR form with the given shape.
+func NewCSRMatrix(m, n int) *CompressedMatrix {
+	return &CompressedMatrix{
 		data:    []float64{},
 		indices: []int{},
 		indptr:  make([]int, m+1),
@@ -29,14 +31,27 @@ func NewCSRMatrix(m, n int) *CSRMatrix {
 	}
 }
 
+// NewCSCMatrix creates a new CompressedMatrix in CSC form with the given
+// shape.
+func NewCSCMatrix(m, n int) *CompressedMatrix {
+	return &CompressedMatrix{
+		data:    []float64{},
+		indices: []int{},
+		indptr:  make([]int, n+1),
+		shape:   [2]int{m, n},
+		isCSC:   true,
+	}
+}
+
 // Get returns the value in the matrix at the given indices.
-func (c *CSRMatrix) Get(row, col int) float64 {
-	majorIndex := row
-	minorIndex := col
-	start := c.indptr[majorIndex]
-	end := c.indptr[majorIndex+1]
+func (c *CompressedMatrix) Get(row, col int) float64 {
+	if c.isCSC {
+		row, col = col, row
+	}
+	start := c.indptr[row]
+	end := c.indptr[row+1]
 	for i := start; i < end; i++ {
-		if c.indices[i] == minorIndex {
+		if c.indices[i] == col {
 			return c.data[i]
 		}
 	}
@@ -44,7 +59,10 @@ func (c *CSRMatrix) Get(row, col int) float64 {
 }
 
 // Set inserts a new value or updates an old one at the given indices.
-func (c *CSRMatrix) Set(row, col int, val float64) {
+func (c *CompressedMatrix) Set(row, col int, val float64) {
+	if c.isCSC {
+		row, col = col, row
+	}
 	begin := c.indptr[row]
 	end := c.indptr[row+1]
 	if begin == end {
@@ -106,14 +124,14 @@ func (c *CSRMatrix) Set(row, col int, val float64) {
 }
 
 // NNZ gives the number of nonzero entries in the matrix.
-func (c *CSRMatrix) NNZ() int {
+func (c *CompressedMatrix) NNZ() int {
 	return c.indptr[c.shape[0]]
 }
 
 // CSRIterator represents an iterator that yields the non-zero values in the
 // matrix in row-major order.
 type CSRIterator struct {
-	m        *CSRMatrix
+	m        *CompressedMatrix
 	valIndex int
 	rowIndex int
 	rowStart int
@@ -121,7 +139,7 @@ type CSRIterator struct {
 }
 
 // IterTriplets creates a new iterator that will yield the value of the matrix.
-func (c *CSRMatrix) IterTriplets() *CSRIterator {
+func (c *CompressedMatrix) IterTriplets() *CSRIterator {
 	return &CSRIterator{
 		m:        c,
 		valIndex: 0,
@@ -148,10 +166,19 @@ func (t *CSRIterator) Next() (*Triplet, bool) {
 		t.rowStart = t.m.indptr[t.rowIndex]
 		t.rowEnd = t.m.indptr[t.rowIndex+1]
 	}
-	ret := &Triplet{
-		Row: t.rowIndex,
-		Col: t.m.indices[t.valIndex],
-		Val: t.m.data[t.valIndex],
+	var ret *Triplet
+	if t.m.isCSC {
+		ret = &Triplet{
+			Row: t.m.indices[t.valIndex],
+			Col: t.rowIndex,
+			Val: t.m.data[t.valIndex],
+		}
+	} else {
+		ret = &Triplet{
+			Row: t.rowIndex,
+			Col: t.m.indices[t.valIndex],
+			Val: t.m.data[t.valIndex],
+		}
 	}
 	t.valIndex++
 	if t.valIndex == t.rowEnd {
@@ -177,7 +204,7 @@ func (t *Triplet) LessThan(other *Triplet) bool {
 }
 
 // AddCSR computes the sum of two CSR matrices.
-func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
+func AddCSR(c1 *CompressedMatrix, c2 *CompressedMatrix) *CompressedMatrix {
 	if c1.shape[0] != c2.shape[0] || c1.shape[1] != c2.shape[1] {
 		panic("Adding matrices of different sizes")
 	}
@@ -250,7 +277,7 @@ func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
 			continue
 		}
 	}
-	return &CSRMatrix{
+	return &CompressedMatrix{
 		data:    data,
 		indptr:  indptr,
 		indices: indices,
