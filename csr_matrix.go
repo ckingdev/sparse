@@ -1,5 +1,6 @@
 package sparse
 
+// CSRMatrix represents a sparse matrix in compressed row storage format.
 type CSRMatrix struct {
 	// data in row-major format
 	data []float64
@@ -13,10 +14,12 @@ type CSRMatrix struct {
 	shape [2]int
 }
 
+// Shape returns two ints describing the mxn shape of the matrix.
 func (c *CSRMatrix) Shape() (int, int) {
 	return c.shape[0], c.shape[1]
 }
 
+// NewCSRMatrix creates a new CSRMatrix with the given shape.
 func NewCSRMatrix(m, n int) *CSRMatrix {
 	return &CSRMatrix{
 		data:    []float64{},
@@ -26,6 +29,7 @@ func NewCSRMatrix(m, n int) *CSRMatrix {
 	}
 }
 
+// Get returns the value in the matrix at the given indices.
 func (c *CSRMatrix) Get(row, col int) float64 {
 	majorIndex := row
 	minorIndex := col
@@ -39,6 +43,7 @@ func (c *CSRMatrix) Get(row, col int) float64 {
 	return 0.0
 }
 
+// Set inserts a new value or updates an old one at the given indices.
 func (c *CSRMatrix) Set(row, col int, val float64) {
 	begin := c.indptr[row]
 	end := c.indptr[row+1]
@@ -72,10 +77,13 @@ func (c *CSRMatrix) Set(row, col int, val float64) {
 	}
 }
 
+// NNZ gives the number of nonzero entries in the matrix.
 func (c *CSRMatrix) NNZ() int {
 	return c.indptr[c.shape[0]]
 }
 
+// CSRIterator represents an iterator that yields the non-zero values in the
+// matrix in row-major order.
 type CSRIterator struct {
 	m        *CSRMatrix
 	valIndex int
@@ -84,6 +92,7 @@ type CSRIterator struct {
 	rowEnd   int
 }
 
+// IterTriplets creates a new iterator that will yield the value of the matrix.
 func (c *CSRMatrix) IterTriplets() *CSRIterator {
 	return &CSRIterator{
 		m:        c,
@@ -94,11 +103,14 @@ func (c *CSRMatrix) IterTriplets() *CSRIterator {
 	}
 }
 
+// Triplet represents an element of a matrix- row, column, and value.
 type Triplet struct {
 	Row, Col int
 	Val      float64
 }
 
+// Next yields the next element of the matrix (using row-major ordering) and
+// advances the iterator.
 func (t *CSRIterator) Next() (*Triplet, bool) {
 	if t.valIndex >= t.m.indptr[t.m.shape[0]] {
 		return nil, false
@@ -121,10 +133,11 @@ func (t *CSRIterator) Next() (*Triplet, bool) {
 			t.rowEnd = t.m.indptr[t.rowIndex+1]
 		}
 	}
-
 	return ret, true
 }
 
+// LessThan returns whether the calling triplet is less than another triplet
+// given row-major ordering.
 func (t *Triplet) LessThan(other *Triplet) bool {
 	if t.Row < other.Row {
 		return true
@@ -135,6 +148,7 @@ func (t *Triplet) LessThan(other *Triplet) bool {
 	return false
 }
 
+// AddCSR computes the sum of two CSR matrices.
 func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
 	if c1.shape[0] != c2.shape[0] || c1.shape[1] != c2.shape[1] {
 		panic("Adding matrices of different sizes")
