@@ -48,8 +48,18 @@ func (c *CSRMatrix) Set(row, col int, val float64) {
 	begin := c.indptr[row]
 	end := c.indptr[row+1]
 	if begin == end {
-		c.indices = append(c.indices[0:begin], append([]int{col}, c.indices[begin:]...)...)
-		c.data = append(c.data[0:begin], append([]float64{val}, c.data[begin:]...)...)
+		c.indices = append(c.indices, 0)
+		for i := len(c.indices) - 2; i >= begin; i-- {
+			c.indices[i+1] = c.indices[i]
+		}
+		c.indices[begin] = col
+
+		c.data = append(c.data, 0.0)
+		for i := len(c.data) - 2; i >= begin; i-- {
+			c.data[i+1] = c.data[i]
+		}
+		c.data[begin] = val
+
 		for i := row + 1; i < c.shape[0]; i++ {
 			c.indptr[i]++
 		}
@@ -65,13 +75,31 @@ func (c *CSRMatrix) Set(row, col int, val float64) {
 			for j := i + 1; j < c.shape[0]; j++ {
 				c.indptr[j]++
 			}
-			c.indices = append(c.indices[0:i], append([]int{col}, c.indices[i:]...)...)
-			c.data = append(c.data[0:i], append([]float64{val}, c.data[i:]...)...)
+			c.indices = append(c.indices, 0)
+			for j := len(c.indices) - 2; j >= i; j-- {
+				c.indices[j+1] = c.indices[j]
+			}
+			c.indices[i] = col
+			c.data = append(c.data, 0.0)
+			for j := len(c.data) - 2; j >= i; j-- {
+				c.data[j+1] = c.data[j]
+			}
+			c.data[i] = val
 			c.indptr[c.shape[0]]++
 		}
 	}
-	c.indices = append(c.indices[0:end], append([]int{col}, c.indices[end:]...)...)
-	c.data = append(c.data[0:end], append([]float64{val}, c.data[end:]...)...)
+	c.indices = append(c.indices, 0)
+	for i := len(c.indices) - 2; i >= end; i-- {
+		c.indices[i+1] = c.indices[i]
+	}
+	c.indices[end] = col
+
+	c.data = append(c.data, 0.0)
+	for i := len(c.data) - 2; i >= end; i-- {
+		c.data[i+1] = c.data[i]
+	}
+	c.data[end] = val
+
 	for j := row + 1; j <= c.shape[0]; j++ {
 		c.indptr[j]++
 	}
