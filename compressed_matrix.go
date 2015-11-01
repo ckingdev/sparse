@@ -205,6 +205,9 @@ func (t *Triplet) LessThan(other *Triplet) bool {
 
 // AddCSR computes the sum of two CSR matrices.
 func AddCSR(c1 *CompressedMatrix, c2 *CompressedMatrix) *CompressedMatrix {
+	if c1.isCSC || c2.isCSC {
+		panic("One or both matrices are CSC.")
+	}
 	if c1.shape[0] != c2.shape[0] || c1.shape[1] != c2.shape[1] {
 		panic("Adding matrices of different sizes")
 	}
