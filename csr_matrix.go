@@ -79,7 +79,7 @@ func (c *CSRMatrix) setSingleElement(row, col int, val float64) {
 	if begin == end {
 		c.indices = append(c.indices[0:begin], append([]int{col}, c.indices[begin:]...)...)
 		c.data = append(c.data[0:begin], append([]float64{val}, c.data[begin:]...)...)
-		for i := begin + 1; i < c.shape[0]; i++ {
+		for i := row + 1; i < c.shape[0]; i++ {
 			c.indptr[i]++
 		}
 		c.indptr[c.shape[0]]++
@@ -99,10 +99,61 @@ func (c *CSRMatrix) setSingleElement(row, col int, val float64) {
 			c.indptr[c.shape[0]]++
 		}
 	}
+	c.indices = append(c.indices[0:end], append([]int{col}, c.indices[end:]...)...)
+	c.data = append(c.data[0:end], append([]float64{val}, c.data[end:]...)...)
+	for j := row + 1; j <= c.shape[0]; j++ {
+		c.indptr[j]++
+	}
 }
 
 func (c *CSRMatrix) NNZ() int {
 	return c.indptr[c.shape[0]]
+}
+
+type CSRIterator struct {
+	m     *CSRMatrix
+	i     int
+	j     int
+	row   int
+	start int
+	end   int
+}
+
+func (c *CSRMatrix) IterTriplets() *CSRIterator {
+	return &CSRIterator{
+		m:     c,
+		i:     0,
+		j:     0,
+		row:   0,
+		start: 0,
+		end:   c.indptr[1],
+	}
+}
+
+type Triplet struct {
+	row, col int
+	val      float64
+}
+
+func (t *CSRIterator) Next() (*Triplet, bool) {
+	if t.i >= t.m.indptr[t.m.shape[0]] {
+		return nil, false
+	}
+	// advance if there's an empty row or we're at the end of the row
+	for t.start == t.end || t.j == t.end {
+		fmt.Println("Advancing row")
+		t.row++
+		t.start = t.end
+		t.end = t.m.indptr[t.row+1]
+		t.j = t.m.indices[t.start]
+	}
+	t.i++
+	t.j++
+	return &Triplet{
+		row: t.row,
+		col: t.m.indices[t.j-1],
+		val: t.m.data[t.i-1],
+	}, true
 }
 
 func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
