@@ -1,11 +1,5 @@
 package sparse
 
-import (
-	"fmt"
-)
-
-//import "fmt"
-
 type CSRMatrix struct {
 	// data in row-major format
 	data []float64
@@ -19,40 +13,8 @@ type CSRMatrix struct {
 	shape [2]int
 }
 
-func (c *CSRMatrix) Index(i, j int) float64 {
-	return c.getSingleElement(i, j)
-}
-
-func (c *CSRMatrix) Size() (int, int) {
+func (c *CSRMatrix) Shape() (int, int) {
 	return c.shape[0], c.shape[1]
-}
-
-func (c *CSRMatrix) Insert(i, j int, val float64) {
-	c.setSingleElement(i, j, val)
-}
-
-func (c *CSRMatrix) IterItems() chan Item {
-	ret := make(chan Item)
-	go func() {
-		for i := 0; i < c.shape[0]; i++ {
-			for j := c.indptr[i]; j < c.indptr[i+1]; j++ {
-				ret <- Item{i, c.indices[j], c.data[j]}
-			}
-		}
-		close(ret)
-	}()
-	return ret
-}
-
-func (c *CSRMatrix) IterValues() chan float64 {
-	ret := make(chan float64)
-	go func() {
-		for _, val := range c.data {
-			ret <- val
-		}
-		close(ret)
-	}()
-	return ret
 }
 
 func NewCSRMatrix(m, n int) *CSRMatrix {
@@ -64,7 +26,7 @@ func NewCSRMatrix(m, n int) *CSRMatrix {
 	}
 }
 
-func (c *CSRMatrix) getSingleElement(row, col int) float64 {
+func (c *CSRMatrix) Get(row, col int) float64 {
 	majorIndex := row
 	minorIndex := col
 	start := c.indptr[majorIndex]
@@ -77,7 +39,7 @@ func (c *CSRMatrix) getSingleElement(row, col int) float64 {
 	return 0.0
 }
 
-func (c *CSRMatrix) setSingleElement(row, col int, val float64) {
+func (c *CSRMatrix) Set(row, col int, val float64) {
 	begin := c.indptr[row]
 	end := c.indptr[row+1]
 	if begin == end {
@@ -133,8 +95,8 @@ func (c *CSRMatrix) IterTriplets() *CSRIterator {
 }
 
 type Triplet struct {
-	row, col int
-	val      float64
+	Row, Col int
+	Val      float64
 }
 
 func (t *CSRIterator) Next() (*Triplet, bool) {
@@ -147,9 +109,9 @@ func (t *CSRIterator) Next() (*Triplet, bool) {
 		t.rowEnd = t.m.indptr[t.rowIndex+1]
 	}
 	ret := &Triplet{
-		row: t.rowIndex,
-		col: t.m.indices[t.valIndex],
-		val: t.m.data[t.valIndex],
+		Row: t.rowIndex,
+		Col: t.m.indices[t.valIndex],
+		Val: t.m.data[t.valIndex],
 	}
 	t.valIndex++
 	if t.valIndex == t.rowEnd {
@@ -164,10 +126,10 @@ func (t *CSRIterator) Next() (*Triplet, bool) {
 }
 
 func (t *Triplet) LessThan(other *Triplet) bool {
-	if t.row < other.row {
+	if t.Row < other.Row {
 		return true
 	}
-	if t.row == other.row && t.col < other.col {
+	if t.Row == other.Row && t.Col < other.Col {
 		return true
 	}
 	return false
@@ -196,9 +158,9 @@ func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
 		}
 		if !ok1 {
 			for ok2 {
-				data = append(data, t2.val)
-				indices = append(indices, t2.col)
-				for i := t2.row + 1; i < c2.shape[0]+1; i++ {
+				data = append(data, t2.Val)
+				indices = append(indices, t2.Col)
+				for i := t2.Row + 1; i < c2.shape[0]+1; i++ {
 					indptr[i]++
 				}
 				t2, ok2 = iter2.Next()
@@ -207,9 +169,9 @@ func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
 		}
 		if !ok2 {
 			for ok1 {
-				data = append(data, t1.val)
-				indices = append(indices, t1.col)
-				for i := t1.row + 1; i < c1.shape[0]+1; i++ {
+				data = append(data, t1.Val)
+				indices = append(indices, t1.Col)
+				for i := t1.Row + 1; i < c1.shape[0]+1; i++ {
 					indptr[i]++
 				}
 				t1, ok1 = iter1.Next()
@@ -218,27 +180,27 @@ func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
 		}
 		if t1.LessThan(t2) {
 			// add t1, advance t1, and continue
-			data = append(data, t1.val)
-			indices = append(indices, t1.col)
-			for i := t1.row + 1; i < c1.shape[0]+1; i++ {
+			data = append(data, t1.Val)
+			indices = append(indices, t1.Col)
+			for i := t1.Row + 1; i < c1.shape[0]+1; i++ {
 				indptr[i]++
 			}
 			t1, ok1 = iter1.Next()
 			continue
 		} else if t2.LessThan(t1) {
 			// add t2, advance t2, and continue
-			data = append(data, t2.val)
-			indices = append(indices, t2.col)
-			for i := t2.row + 1; i < c2.shape[0]+1; i++ {
+			data = append(data, t2.Val)
+			indices = append(indices, t2.Col)
+			for i := t2.Row + 1; i < c2.shape[0]+1; i++ {
 				indptr[i]++
 			}
 			t2, ok2 = iter2.Next()
 			continue
 		} else {
 			// add t1+t2, advance both, continue
-			data = append(data, t1.val+t2.val)
-			indices = append(indices, t1.col)
-			for i := t1.row + 1; i < c1.shape[0]+1; i++ {
+			data = append(data, t1.Val+t2.Val)
+			indices = append(indices, t1.Col)
+			for i := t1.Row + 1; i < c1.shape[0]+1; i++ {
 				indptr[i]++
 			}
 			t1, ok1 = iter1.Next()
@@ -246,10 +208,6 @@ func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
 			continue
 		}
 	}
-	fmt.Println(data)
-	fmt.Println(indptr)
-	fmt.Println(indices)
-
 	return &CSRMatrix{
 		data:    data,
 		indptr:  indptr,

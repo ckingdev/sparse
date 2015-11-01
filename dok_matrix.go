@@ -5,48 +5,18 @@ import (
 )
 
 type DOKMatrix struct {
-	data map[int]map[int]float64
-	size [2]int
-}
-
-func (d *DOKMatrix) IterItems(bufferSize int) chan Item {
-	iter := make(chan Item, bufferSize)
-	go func() {
-		for i, row := range d.data {
-			for j, val := range row {
-				iter <- Item{
-					Row: i,
-					Col: j,
-					Val: val,
-				}
-			}
-		}
-		close(iter)
-	}()
-	return iter
-}
-
-func (d *DOKMatrix) IterValues() chan float64 {
-	iter := make(chan float64)
-	go func() {
-		for _, row := range d.data {
-			for _, val := range row {
-				iter <- val
-			}
-		}
-		close(iter)
-	}()
-	return iter
+	data  map[int]map[int]float64
+	shape [2]int
 }
 
 func NewDOKMatrix(m, n int) *DOKMatrix {
 	return &DOKMatrix{
-		data: make(map[int]map[int]float64),
-		size: [2]int{m, n},
+		data:  make(map[int]map[int]float64),
+		shape: [2]int{m, n},
 	}
 }
 
-func (d *DOKMatrix) Index(i, j int) float64 {
+func (d *DOKMatrix) Get(i, j int) float64 {
 	row, ok := d.data[i]
 	if !ok {
 		return 0.0
@@ -54,11 +24,11 @@ func (d *DOKMatrix) Index(i, j int) float64 {
 	return row[j]
 }
 
-func (d *DOKMatrix) Size() (int, int) {
-	return d.size[0], d.size[1]
+func (d *DOKMatrix) Shape() (int, int) {
+	return d.shape[0], d.shape[1]
 }
 
-func (d *DOKMatrix) Insert(i, j int, val float64) {
+func (d *DOKMatrix) Set(i, j int, val float64) {
 	row, ok := d.data[i]
 	if !ok {
 		d.data[i] = map[int]float64{j: val}
@@ -68,7 +38,7 @@ func (d *DOKMatrix) Insert(i, j int, val float64) {
 }
 
 func (d *DOKMatrix) Copy() *DOKMatrix {
-	mcopy := NewDOKMatrix(d.size[0], d.size[1])
+	mcopy := NewDOKMatrix(d.shape[0], d.shape[1])
 	for i, row := range mcopy.data {
 		mcopy.data[i] = map[int]float64{}
 		for j, val := range row {
@@ -79,7 +49,7 @@ func (d *DOKMatrix) Copy() *DOKMatrix {
 }
 
 func DOKSum(m1, m2 *DOKMatrix) (*DOKMatrix, error) {
-	if m1.size[0] != m2.size[0] || m1.size[1] != m2.size[1] {
+	if m1.shape[0] != m2.shape[0] || m1.shape[1] != m2.shape[1] {
 		return nil, fmt.Errorf("Size mismatch")
 	}
 	sum := m1.Copy()
