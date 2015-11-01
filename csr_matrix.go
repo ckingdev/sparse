@@ -1,6 +1,10 @@
 package sparse
 
-import "fmt"
+import (
+	"fmt"
+)
+
+//import "fmt"
 
 type CSRMatrix struct {
 	// data in row-major format
@@ -111,22 +115,20 @@ func (c *CSRMatrix) NNZ() int {
 }
 
 type CSRIterator struct {
-	m     *CSRMatrix
-	i     int
-	j     int
-	row   int
-	start int
-	end   int
+	m        *CSRMatrix
+	valIndex int
+	rowIndex int
+	rowStart int
+	rowEnd   int
 }
 
 func (c *CSRMatrix) IterTriplets() *CSRIterator {
 	return &CSRIterator{
-		m:     c,
-		i:     0,
-		j:     0,
-		row:   0,
-		start: 0,
-		end:   c.indptr[1],
+		m:        c,
+		valIndex: 0,
+		rowIndex: 0,
+		rowStart: 0,
+		rowEnd:   c.indptr[1],
 	}
 }
 
@@ -136,24 +138,39 @@ type Triplet struct {
 }
 
 func (t *CSRIterator) Next() (*Triplet, bool) {
-	if t.i >= t.m.indptr[t.m.shape[0]] {
+	if t.valIndex >= t.m.indptr[t.m.shape[0]] {
 		return nil, false
 	}
-	// advance if there's an empty row or we're at the end of the row
-	for t.start == t.end || t.j == t.end {
-		fmt.Println("Advancing row")
-		t.row++
-		t.start = t.end
-		t.end = t.m.indptr[t.row+1]
-		t.j = t.m.indices[t.start]
+	for t.rowStart == t.rowEnd {
+		t.rowIndex++
+		t.rowStart = t.m.indptr[t.rowIndex]
+		t.rowEnd = t.m.indptr[t.rowIndex+1]
 	}
-	t.i++
-	t.j++
-	return &Triplet{
-		row: t.row,
-		col: t.m.indices[t.j-1],
-		val: t.m.data[t.i-1],
-	}, true
+	ret := &Triplet{
+		row: t.rowIndex,
+		col: t.m.indices[t.valIndex],
+		val: t.m.data[t.valIndex],
+	}
+	t.valIndex++
+	if t.valIndex == t.rowEnd {
+		for t.valIndex == t.rowEnd && t.rowEnd != t.m.indptr[t.m.shape[0]] {
+			t.rowIndex++
+			t.rowStart = t.m.indptr[t.rowIndex]
+			t.rowEnd = t.m.indptr[t.rowIndex+1]
+		}
+	}
+
+	return ret, true
+}
+
+func (t *Triplet) LessThan(other *Triplet) bool {
+	if t.row < other.row {
+		return true
+	}
+	if t.row == other.row && t.col < other.col {
+		return true
+	}
+	return false
 }
 
 func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
@@ -169,71 +186,70 @@ func AddCSR(c1 *CSRMatrix, c2 *CSRMatrix) *CSRMatrix {
 	data := make([]float64, 0, larger)
 	indptr := make([]int, c1.shape[0]+1)
 	indices := make([]int, 0, larger)
-	for row, start1 := range c1.indptr[0 : len(c1.indptr)-1] {
-		fmt.Println(row)
-		indptr[row+1] = indptr[row]
-		start2 := c1.indptr[row]
-		end1 := c1.indptr[row+1]
-		end2 := c2.indptr[row+1]
-		if start1 == end1 {
-			if start2 == end2 {
-				continue
-			}
-			for k := start2; k < end2; k++ {
-				data = append(data, c2.data[k])
-				indices = append(indices, c2.indices[k])
-				indptr[row+1]++
-			}
-			continue
-		} else if start2 == end2 {
-			for k := start1; k < end1; k++ {
-				data = append(data, c1.data[k])
-				indices = append(indices, c1.indices[k])
-				indptr[row+1]++
-			}
-			continue
+	iter1 := c1.IterTriplets()
+	iter2 := c2.IterTriplets()
+	t1, ok1 := iter1.Next()
+	t2, ok2 := iter2.Next()
+	for {
+		if !ok1 && !ok2 {
+			break
 		}
-		i := start1
-		j := start2
-		for {
-			if i == end1 && j == end2 {
-				break
-			} else if i == end1 {
-				for k := j; k < end2; k++ {
-					data = append(data, c2.data[k])
-					indices = append(indices, c2.indices[k])
-					indptr[row+1]++
+		if !ok1 {
+			for ok2 {
+				data = append(data, t2.val)
+				indices = append(indices, t2.col)
+				for i := t2.row + 1; i < c2.shape[0]+1; i++ {
+					indptr[i]++
 				}
-				break
-			} else if j == end2 {
-				for k := i; k < end1; k++ {
-					data = append(data, c1.data[k])
-					indices = append(indices, c1.indices[k])
-					indptr[row+1]++
+				t2, ok2 = iter2.Next()
+			}
+			break
+		}
+		if !ok2 {
+			for ok1 {
+				data = append(data, t1.val)
+				indices = append(indices, t1.col)
+				for i := t1.row + 1; i < c1.shape[0]+1; i++ {
+					indptr[i]++
 				}
-				break
+				t1, ok1 = iter1.Next()
 			}
-			if c1.indices[i] == c1.indices[j] {
-				fmt.Printf("i, j: %v, %v\n", i, j)
-				val := c1.data[i] + c2.data[j]
-				data = append(data, val)
-				indices = append(indices, c1.indices[i])
-				i++
-				j++
-			} else if c1.indices[i] < c2.indices[j] {
-				data = append(data, c1.data[i])
-				indices = append(indices, c1.indices[i])
-				indptr[row+1]++
-				i++
-			} else {
-				data = append(data, c2.data[j])
-				indices = append(indices, c2.indices[j])
-				indptr[row+1]++
-				j++
+			break
+		}
+		if t1.LessThan(t2) {
+			// add t1, advance t1, and continue
+			data = append(data, t1.val)
+			indices = append(indices, t1.col)
+			for i := t1.row + 1; i < c1.shape[0]+1; i++ {
+				indptr[i]++
 			}
-			indptr[row+1]++
+			t1, ok1 = iter1.Next()
+			continue
+		} else if t2.LessThan(t1) {
+			// add t2, advance t2, and continue
+			data = append(data, t2.val)
+			indices = append(indices, t2.col)
+			for i := t2.row + 1; i < c2.shape[0]+1; i++ {
+				indptr[i]++
+			}
+			t2, ok2 = iter2.Next()
+			continue
+		} else {
+			// add t1+t2, advance both, continue
+			data = append(data, t1.val+t2.val)
+			indices = append(indices, t1.col)
+			for i := t1.row + 1; i < c1.shape[0]+1; i++ {
+				indptr[i]++
+			}
+			t1, ok1 = iter1.Next()
+			t2, ok2 = iter2.Next()
+			continue
 		}
 	}
+	fmt.Println(data)
+	fmt.Println(indptr)
+	fmt.Println(indices)
+
 	return &CSRMatrix{
 		data:    data,
 		indptr:  indptr,
