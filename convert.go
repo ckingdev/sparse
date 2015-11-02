@@ -6,7 +6,7 @@ func ConvertToCSC(m Matrix) *CompressedMatrix {
 		if a.isCSC {
 			return a
 		} else {
-			// convert from CSR to CSC
+			return csrToCSC(a)
 		}
 	case *DOKMatrix:
 		return dokToCSC(a)
