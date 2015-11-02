@@ -201,12 +201,20 @@ func (c *CompressedMatrix) NewRowIter(i int) *CompressedRowColIter {
 }
 
 func (c *CompressedRowColIter) Next() (*Triplet, bool) {
-	if isCol {
+	if c.isCol {
 		panic("Not yet implemented")
 	}
 	if c.ind <= c.m.indptr[c.rowcol+1] {
 		c.ind++
-		return c.m.data[c.ind-1], true
+		t := Triplet{Val: c.m.data[c.ind]}
+		if c.isCol {
+			t.Col = c.rowcol
+			t.Row = c.ind
+		} else {
+			t.Col = c.ind
+			t.Row = c.rowcol
+		}
+		return &t, true
 	}
 	return nil, false
 }
