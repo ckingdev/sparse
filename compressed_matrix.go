@@ -130,7 +130,7 @@ func (c *CompressedMatrix) NNZ() int {
 
 // CSRIterator represents an iterator that yields the non-zero values in the
 // matrix in row-major order.
-type CSRIterator struct {
+type CompressedIterator struct {
 	m        *CompressedMatrix
 	valIndex int
 	rowIndex int
@@ -139,8 +139,8 @@ type CSRIterator struct {
 }
 
 // IterTriplets creates a new iterator that will yield the value of the matrix.
-func (c *CompressedMatrix) IterTriplets() *CSRIterator {
-	return &CSRIterator{
+func (c *CompressedMatrix) IterTriplets() *CompressedIterator {
+	return &CompressedIterator{
 		m:        c,
 		valIndex: 0,
 		rowIndex: 0,
@@ -151,7 +151,7 @@ func (c *CompressedMatrix) IterTriplets() *CSRIterator {
 
 // Next yields the next element of the matrix (using row-major ordering) and
 // advances the iterator.
-func (t *CSRIterator) Next() (*Triplet, bool) {
+func (t *CompressedIterator) Next() (*Triplet, bool) {
 	if t.valIndex >= t.m.indptr[t.m.shape[0]] {
 		return nil, false
 	}
@@ -183,6 +183,32 @@ func (t *CSRIterator) Next() (*Triplet, bool) {
 		}
 	}
 	return ret, true
+}
+
+type CompressedRowColIter struct {
+	m      *CompressedMatrix
+	ind    int
+	rowcol int
+	isCol  bool
+}
+
+func (c *CompressedMatrix) NewRowIter(i int) *CompressedRowColIter {
+	return &CompressedRowColIter{
+		m:     c,
+		ind:   i,
+		isCol: false,
+	}
+}
+
+func (c *CompressedRowColIter) Next() (*Triplet, bool) {
+	if isCol {
+		panic("Not yet implemented")
+	}
+	if c.ind <= c.m.indptr[c.rowcol+1] {
+		c.ind++
+		return c.m.data[c.ind-1], true
+	}
+	return nil, false
 }
 
 // AddCSR computes the sum of two CSR matrices.
