@@ -149,12 +149,6 @@ func (c *CompressedMatrix) IterTriplets() *CSRIterator {
 	}
 }
 
-// Triplet represents an element of a matrix- row, column, and value.
-type Triplet struct {
-	Row, Col int
-	Val      float64
-}
-
 // Next yields the next element of the matrix (using row-major ordering) and
 // advances the iterator.
 func (t *CSRIterator) Next() (*Triplet, bool) {
@@ -189,18 +183,6 @@ func (t *CSRIterator) Next() (*Triplet, bool) {
 		}
 	}
 	return ret, true
-}
-
-// LessThan returns whether the calling triplet is less than another triplet
-// given row-major ordering.
-func (t *Triplet) LessThan(other *Triplet) bool {
-	if t.Row < other.Row {
-		return true
-	}
-	if t.Row == other.Row && t.Col < other.Col {
-		return true
-	}
-	return false
 }
 
 // AddCSR computes the sum of two CSR matrices.
